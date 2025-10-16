@@ -1,72 +1,65 @@
-import os
-from threading import Thread
-from flask import Flask
 import nextcord
 from nextcord.ext import commands
 from deep_translator import GoogleTranslator
+import os
 
-# ---------------- Flask for Render ----------------
-app = Flask("")
-
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 5000))  # Render sets the PORT
-    app.run(host="0.0.0.0", port=port)
-
-Thread(target=run_flask).start()
-
-# ---------------- Discord Bot ----------------
+# ---------- Bot Setup ----------
 intents = nextcord.Intents.default()
-intents.message_content = True  # Needed for prefix commands & replies
-
+intents.message_content = True  # Required for prefix commands
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ---------------- Supported Languages ----------------
-# Fetch from GoogleTranslator instance
-translator_instance = GoogleTranslator(source="auto", target="en")  # just dummy instance
-SUPPORTED_LANGS = GoogleTranslator.get_supported_languages(as_dict=True)
+# ---------- Google Translator Setup ----------
+translator_instance = GoogleTranslator(source="auto", target="en")
+SUPPORTED_LANGS = translator_instance.get_supported_languages(as_dict=True)
+LANG_CODES = {v: k for k, v in SUPPORTED_LANGS.items()}  # Reverse lookup
 
-# ---------------- Events ----------------
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
+# ---------- Helper Function ----------
+def translate_text(text: str, target_lang: str) -> str:
+    translator = GoogleTranslator(source="auto", target=target_lang)
+    return translator.translate(text)
 
-# ---------------- Translate Command ----------------
-@bot.slash_command(name="translate", description="Translate a message")
-@bot.command(name="translate")  # Prefix command
-async def translate(ctx, target_lang: str, *, text: str = None):
+# ---------- Prefix Command ----------
+@bot.command(name="translate")
+async def translate_prefix(ctx, target_lang: str):
+    # Check if user replied to a message
+    if ctx.message.reference:
+        ref_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        text_to_translate = ref_msg.content
+    else:
+        await ctx.send("Please reply to a message to translate.")
+        return
+
+    target_lang = target_lang.lower()
+    if target_lang not in LANG_CODES:
+        await ctx.send(f"Language not supported! Supported: {', '.join(SUPPORTED_LANGS.keys())}")
+        return
+
     try:
-        # If user replied to a message and no text provided, use that message
-        if isinstance(ctx, nextcord.Interaction):
-            msg = ctx.message if hasattr(ctx, "message") else None
-        else:
-            msg = ctx.message.reference.resolved if ctx.message.reference else None
-
-        if not text and msg:
-            text = msg.content
-
-        if not text:
-            await ctx.send("You must provide text or reply to a message!", ephemeral=True if isinstance(ctx, nextcord.Interaction) else False)
-            return
-
-        target_lang = target_lang.lower()
-        if target_lang not in SUPPORTED_LANGS and target_lang not in SUPPORTED_LANGS.values():
-            await ctx.send(f"Unsupported language: `{target_lang}`")
-            return
-
-        translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
-
-        # Discord limit
-        if len(translated) > 2000:
-            translated = translated[:1997] + "..."
-
-        await ctx.send(f"**Translated ({target_lang}):** {translated}")
-
+        translated = translate_text(text_to_translate, target_lang)
+        await ctx.send(f"**Translated ({LANG_CODES[target_lang]}):** {translated}")
     except Exception as e:
-        await ctx.send(f"Error translating: {e}")
+        await ctx.send(f"Error translating text: {e}")
 
-# ---------------- Run Bot ----------------
-bot.run(os.environ["DISCORD_TOKEN"])
+# ---------- Slash Command ----------
+@bot.slash_command(name="translate", description="Translate a message")
+async def translate_slash(interaction: nextcord.Interaction, target_lang: str):
+    if not interaction.message.reference:
+        await interaction.response.send_message("Reply to a message to translate.", ephemeral=True)
+        return
+
+    ref_msg = await interaction.channel.fetch_message(interaction.message.reference.message_id)
+    text_to_translate = ref_msg.content
+
+    target_lang = target_lang.lower()
+    if target_lang not in LANG_CODES:
+        await interaction.response.send_message(f"Language not supported! Supported: {', '.join(SUPPORTED_LANGS.keys())}", ephemeral=True)
+        return
+
+    try:
+        translated = translate_text(text_to_translate, target_lang)
+        await interaction.response.send_message(f"**Translated ({LANG_CODES[target_lang]}):** {translated}")
+    except Exception as e:
+        await interaction.response.send_message(f"Error translating text: {e}", ephemeral=True)
+
+# ---------- Run Bot ----------
+bot.run(os.getenv("DISCORD_TOKEN"))  # Make sure your token is in Render's environment variables
