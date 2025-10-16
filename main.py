@@ -1,34 +1,45 @@
-from deep_translator import GoogleTranslator
 import nextcord
 from nextcord.ext import commands
+from deep_translator import GoogleTranslator
+import os
 
-@bot.command(name="translate")
-async def translate(ctx, target_lang: str, *, text: str):
-    """Translate text into a given language (auto-detect source)."""
+intents = nextcord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+
+# --- SLASH COMMAND ---
+@bot.slash_command(name="translate", description="Translate text into another language")
+async def translate_slash(interaction: nextcord.Interaction, text: str, target_language: str):
     try:
-        target_lang = target_lang.lower().strip()
-
-        # Try the translation
-        translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
-
-        # Format response
-        response = f"**Translated to {target_lang.upper()}:**\n{translated}"
-
-        # Split long messages into chunks (max 2000)
-        if len(response) > 2000:
-            parts = [response[i:i+2000] for i in range(0, len(response), 2000)]
-            for part in parts:
-                await ctx.send(part)
-        else:
-            await ctx.send(response)
-
+        translated = GoogleTranslator(source='auto', target=target_language).translate(text)
+        if len(translated) > 1900:
+            translated = translated[:1900] + "..."
+        await interaction.response.send_message(
+            f"**Translated ({target_language}):**\n{translated}"
+        )
     except Exception as e:
-        err_msg = f"❌ Translation failed: {e}"
+        err_msg = str(e)
+        if len(err_msg) > 1900:
+            err_msg = err_msg[:1900] + "..."
+        await interaction.response.send_message(f"⚠️ Error translating text: {err_msg}")
 
-        # If the error is too long, send as file
-        if len(err_msg) > 2000:
-            with open("error.txt", "w") as f:
-                f.write(str(e))
-            await ctx.send("Error message too long — sent as file instead:", file=nextcord.File("error.txt"))
-        else:
-            await ctx.send(err_msg)
+# --- PREFIX COMMAND ---
+@bot.command(name="translate")
+async def translate_prefix(ctx, target_language: str, *, text: str):
+    try:
+        translated = GoogleTranslator(source='auto', target=target_language).translate(text)
+        if len(translated) > 1900:
+            translated = translated[:1900] + "..."
+        await ctx.send(f"**Translated ({target_language}):**\n{translated}")
+    except Exception as e:
+        err_msg = str(e)
+        if len(err_msg) > 1900:
+            err_msg = err_msg[:1900] + "..."
+        await ctx.send(f"⚠️ Error translating text: {err_msg}")
+
+# --- run bot ---
+bot.run(os.getenv("DISCORD_TOKEN"))
