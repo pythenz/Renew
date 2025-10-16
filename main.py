@@ -1,8 +1,10 @@
 from keep_alive import keep_alive
-import core
+from core import run_bot
+import time
 
-# start tiny web server so Render stays happy
-keep_alive()
-
-# start the Discord bot
-import core
+if __name__ == "__main__":
+    print("Starting keep_alive server...")
+    keep_alive()
+    time.sleep(3)
+    print("Starting Renew bot...")
+    run_bot()
