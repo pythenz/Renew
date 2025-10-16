@@ -1,17 +1,9 @@
-# Discord bot
 nextcord==3.1.1
-
-# Web server
 Flask==3.1.2
-flask-cors
-
-# Environment variables
+flask-cors==3.0.10
 python-dotenv
-
-# HTTP requests
 requests
-
-# Supabase
+deep-translator
 supabase
 supabase-auth
 supabase-functions
@@ -19,7 +11,3 @@ storage3
 postgrest
 realtime
 httpx>=0.24,<0.26
-
-# Translator
-googletrans==4.0.0-rc1
-deep-translator
