@@ -3,7 +3,7 @@ nextcord==3.1.1
 
 # Web server
 Flask==3.1.2
-flask-cors==4.1.2   # only if you use CORS
+flask-cors==3.1.1   # fixed
 
 # Environment variables
 python-dotenv==1.1.1
@@ -11,7 +11,7 @@ python-dotenv==1.1.1
 # HTTP requests
 requests==2.31.0
 
-# Supabase (must match httpx version)
+# Supabase
 supabase==2.3.3
 httpx>=0.24,<0.26
 supabase-auth==2.22.0
@@ -22,4 +22,4 @@ realtime==2.22.0
 
 # Translator
 googletrans==4.0.0-rc1
-# deep-translator==1.11.1  # optional, pick one translator library
+# deep-translator==1.11.1  # optional
