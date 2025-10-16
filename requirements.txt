@@ -2,3 +2,7 @@ nextcord
 supabase
 python-dotenv
 flask
+flask-cors
+python-dotenv
+requests
+deep-translator
