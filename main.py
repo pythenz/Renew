@@ -1,54 +1,34 @@
-import os
+from deep_translator import GoogleTranslator
 import nextcord
 from nextcord.ext import commands
-from deep_translator import GoogleTranslator
-from keep_alive import keep_alive  # Flask server for uptime
 
-# Load environment variables
-TOKEN = os.getenv("DISCORD_TOKEN")
-PREFIX = os.getenv("PREFIX", "!")  # Default to "!" if not set
-
-# Bot setup
-intents = nextcord.Intents.default()
-intents.message_content = True  # Needed for reading message content
-
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
-
-# Start keep_alive Flask server
-keep_alive()
-
-# -------------------
-# Bot Events
-# -------------------
-@bot.event
-async def on_ready():
-    print(f"{bot.user} is online!")
-
-# -------------------
-# Example Commands
-# -------------------
-
-# Ping command
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")
-
-# Translate command
-@bot.command()
-async def translate(ctx, target_language: str, *, text: str):
-    """
-    Usage: !translate <target_language> <text>
-    Example: !translate es Hello world
-    """
+@bot.command(name="translate")
+async def translate(ctx, target_lang: str, *, text: str):
+    """Translate text into a given language (auto-detect source)."""
     try:
-        translated_text = GoogleTranslator(source='auto', target=target_language).translate(text)
-        await ctx.send(f"**Translated:** {translated_text}")
+        target_lang = target_lang.lower().strip()
+
+        # Try the translation
+        translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
+
+        # Format response
+        response = f"**Translated to {target_lang.upper()}:**\n{translated}"
+
+        # Split long messages into chunks (max 2000)
+        if len(response) > 2000:
+            parts = [response[i:i+2000] for i in range(0, len(response), 2000)]
+            for part in parts:
+                await ctx.send(part)
+        else:
+            await ctx.send(response)
+
     except Exception as e:
-        await ctx.send(f"Error translating text: {e}")
+        err_msg = f"❌ Translation failed: {e}"
 
-# Add more commands here...
-
-# -------------------
-# Run bot
-# -------------------
-bot.run(TOKEN)
+        # If the error is too long, send as file
+        if len(err_msg) > 2000:
+            with open("error.txt", "w") as f:
+                f.write(str(e))
+            await ctx.send("Error message too long — sent as file instead:", file=nextcord.File("error.txt"))
+        else:
+            await ctx.send(err_msg)
