@@ -1,0 +1,4 @@
+nextcord
+supabase
+python-dotenv
+flask
