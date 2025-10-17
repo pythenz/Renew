@@ -1,44 +1,53 @@
-import nextcord
-from nextcord.ext import commands, tasks
-from nextcord import Intents
+# main.py
 import os
-from keep_alive import keep_alive  # assuming you have a keep_alive.py for Render
+import nextcord
+from nextcord.ext import commands
+from nextcord import Intents
+from dotenv import load_dotenv
 
-# ---------------------------
-# Bot Setup
-# ---------------------------
+load_dotenv()
+
+TOKEN = os.getenv("TOKEN")
+PORT = int(os.getenv("PORT", 8080))
+
 intents = Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(
-    command_prefix="!",
-    intents=intents,
-    help_command=None,  # optional: remove default help
-)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ---------------------------
+# -----------------------
 # Load Cogs
-# ---------------------------
-for filename in os.listdir("./cogs"):
-    if filename.endswith(".py"):
-        bot.load_extension(f"cogs.{filename[:-3]}")
+# -----------------------
+cogs = ["cogs.moderation"]  # Add more cogs as they are ready
+for cog in cogs:
+    bot.load_extension(cog)
 
-# ---------------------------
-# Events
-# ---------------------------
+# -----------------------
+# Slash command sync on ready
+# -----------------------
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user} | ID: {bot.user.id}")
-    print("------")
+    await bot.tree.sync()
+    print(f"{bot.user} is online!")
 
-# ---------------------------
-# Keep Alive (Flask) for Render
-# ---------------------------
-keep_alive()  # starts the Flask app
+# -----------------------
+# Flask app for Render
+# -----------------------
+from flask import Flask
 
-# ---------------------------
-# Run Bot
-# ---------------------------
-TOKEN = os.getenv("DISCORD_TOKEN")  # put your bot token in Render environment variables
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+# Run Flask in background for Render
+from threading import Thread
+
+def run_flask():
+    app.run(host="0.0.0.0", port=PORT)
+
+Thread(target=run_flask).start()
+
 bot.run(TOKEN)
