@@ -1,46 +1,45 @@
-# main.py
 import os
 import nextcord
 from nextcord.ext import commands, tasks
 from flask import Flask
-from threading import Thread
+import asyncio
 
 # -----------------------
-# Flask for Render keep-alive
+# Flask Web Service
 # -----------------------
-app = Flask(__name__)
+app = Flask("")
 
 @app.route("/")
 def home():
-    return "Bot is alive!"
+    return "Bot is running!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 # -----------------------
-# Bot setup
+# Bot Setup
 # -----------------------
 intents = nextcord.Intents.default()
 intents.members = True
 intents.messages = True
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)  # Removed default help
+intents.message_content = True  # Needed for on_message
+
+bot = commands.Bot(
+    command_prefix="!", 
+    intents=intents, 
+    help_command=None  # Disable default help
+)
 
 # -----------------------
-# Load cogs
+# Load Cogs
 # -----------------------
-initial_cogs = [
-    "cogs.moderation",
-    "cogs.rr",          # Reaction role cog
-    "cogs.help_cog",    # Gothic reaction-based help
-    # Add more cogs here as you build them
-]
+COG_PATH = "apps.cogs"
+cogs = ["moderation", "rr", "help_cog"]  # Add other cogs here
 
-for cog in initial_cogs:
+for cog in cogs:
     try:
-        bot.load_extension(cog)
-        print(f"Loaded cog: {cog}")
+        bot.load_extension(f"{COG_PATH}.{cog}")
+        print(f"Loaded {cog}")
     except Exception as e:
         print(f"Failed to load cog {cog}: {e}")
 
@@ -49,17 +48,12 @@ for cog in initial_cogs:
 # -----------------------
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user} ({bot.user.id})")
-    print("------")
+    print(f"Bot is online as {bot.user}")
 
 # -----------------------
-# Background Flask thread for Render
+# Run Both Flask & Bot
 # -----------------------
-flask_thread = Thread(target=run_flask)
-flask_thread.start()
-
-# -----------------------
-# Run bot
-# -----------------------
-TOKEN = os.environ.get("DISCORD_TOKEN")  # Store your bot token in Render's environment variables
-bot.run(TOKEN)
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(asyncio.to_thread(run_flask))
+    bot.run(os.environ.get("DISCORD_TOKEN"))
