@@ -1,4 +1,3 @@
-# cogs/moderation.py
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.utils import get
@@ -34,15 +33,19 @@ class Moderation(commands.Cog):
         if self.has_mod_role(message.author):
             return
 
+        # Check banned words
         for word in self.banned_words:
             if word.lower() in message.content.lower():
                 await message.delete()
                 await message.channel.send(f"{message.author.mention}, watch your language!", delete_after=5)
+                await self.log_action(message, f"Deleted message with banned word from {message.author}")
                 return
 
+        # Check invites
         if self.invite_block and ("discord.gg/" in message.content.lower() or "discord.com/invite/" in message.content.lower()):
             await message.delete()
             await message.channel.send(f"{message.author.mention}, invites are not allowed!", delete_after=5)
+            await self.log_action(message, f"Deleted invite from {message.author}")
             return
 
     # -----------------------
@@ -69,7 +72,7 @@ class Moderation(commands.Cog):
         await self.log_action(interaction, f"Auto-moderation toggled {state.upper()} by {interaction.user}.")
 
     # -----------------------
-    # Banned words
+    # Banned words management
     # -----------------------
     @commands.command(name="addword")
     async def add_banned_word(self, ctx, *, word: str):
@@ -111,10 +114,10 @@ class Moderation(commands.Cog):
             await interaction.response.send_message(f"Removed '{word}' from banned words.", ephemeral=True)
             await self.log_action(interaction, f"{interaction.user} removed '{word}' from banned words.")
         except ValueError:
-            await interaction.response.send_message("Word not found.", ephemeral=True)
+            await interaction.response.send_message("Word not found in banned list.", ephemeral=True)
 
     # -----------------------
-    # Mod roles
+    # Mod roles management
     # -----------------------
     @commands.command(name="addmodrole")
     async def add_mod_role(self, ctx, *, role_name: str):
@@ -195,11 +198,10 @@ class Moderation(commands.Cog):
         await member.add_roles(role)
         await ctx.send(f"{member} has been muted.")
         await self.log_action(ctx, f"{ctx.author} muted {member}. Duration: {duration}s")
-
         if duration > 0:
             await asyncio.sleep(duration)
             await member.remove_roles(role)
-            await ctx.send(f"{member} has been automatically unmuted after {duration} seconds.")
+            await ctx.send(f"{member} has been unmuted.")
             await self.log_action(ctx, f"{member} auto-unmuted after {duration}s")
 
     @commands.command(name="unmute")
@@ -215,7 +217,7 @@ class Moderation(commands.Cog):
             await ctx.send(f"{member} is not muted.")
 
     # -----------------------
-    # Purge messages
+    # Purge
     # -----------------------
     @commands.command(name="purge")
     async def purge(self, ctx, amount: int):
@@ -225,16 +227,5 @@ class Moderation(commands.Cog):
         await ctx.send(f"Deleted {len(deleted)} messages.", delete_after=5)
         await self.log_action(ctx, f"{ctx.author} purged {len(deleted)} messages in {ctx.channel}.")
 
-    @nextcord.slash_command(name="purge", description="Delete a number of messages")
-    async def purge_slash(self, interaction: nextcord.Interaction, amount: int):
-        if not self.has_mod_role(interaction.user):
-            return await interaction.response.send_message("No permission.", ephemeral=True)
-        deleted = await interaction.channel.purge(limit=amount)
-        await interaction.response.send_message(f"Deleted {len(deleted)} messages.", ephemeral=True)
-        await self.log_action(interaction, f"{interaction.user} purged {len(deleted)} messages in {interaction.channel}.")
-
-# -----------------------
-# Cog setup
-# -----------------------
 def setup(bot):
     bot.add_cog(Moderation(bot))
