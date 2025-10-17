@@ -1,85 +1,65 @@
-import nextcord
-from nextcord.ext import commands
-from nextcord import Interaction, Embed
+# main.py
 import os
+import nextcord
+from nextcord.ext import commands, tasks
 from flask import Flask
+from threading import Thread
 
 # -----------------------
-# Flask Webserver (for Render)
+# Flask for Render keep-alive
 # -----------------------
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running!"
+    return "Bot is alive!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
 # -----------------------
-# Bot Initialization
+# Bot setup
 # -----------------------
 intents = nextcord.Intents.default()
 intents.members = True
-intents.message_content = True  # Needed for prefix commands
-bot = commands.Bot(command_prefix="!", intents=intents)
+intents.messages = True
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)  # Removed default help
 
 # -----------------------
-# Gothic Help Cog
+# Load cogs
 # -----------------------
-class HelpCog(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+initial_cogs = [
+    "cogs.moderation",
+    "cogs.rr",          # Reaction role cog
+    "cogs.help_cog",    # Gothic reaction-based help
+    # Add more cogs here as you build them
+]
 
-    @commands.command(name="help")
-    async def help_command(self, ctx):
-        embed = Embed(
-            title="🦇 Shadows of Commands 🦇",
-            description="Darkness awaits, mortal. Choose your path wisely...",
-            color=0x1C1C1C
-        )
-        for cog_name, cog in self.bot.cogs.items():
-            commands_list = cog.get_commands()
-            if commands_list:
-                desc = ""
-                for command in commands_list:
-                    if not command.hidden:
-                        desc += f"**{ctx.prefix}{command.name}** - {command.help or 'No description'}\n"
-                if desc:
-                    embed.add_field(name=f"⚔️ {cog_name}", value=desc, inline=False)
-        embed.set_footer(text="Use commands with caution...")
-        await ctx.send(embed=embed)
-
-    @nextcord.slash_command(name="help", description="Show all commands")
-    async def help_slash(self, interaction: Interaction):
-        embed = Embed(
-            title="🦇 Shadows of Commands 🦇",
-            description="Darkness awaits, mortal. Choose your path wisely...",
-            color=0x1C1C1C
-        )
-        for cog_name, cog in self.bot.cogs.items():
-            commands_list = cog.get_commands()
-            if commands_list:
-                desc = ""
-                for command in commands_list:
-                    if not command.hidden:
-                        desc += f"**/{command.name}** - {command.help or 'No description'}\n"
-                if desc:
-                    embed.add_field(name=f"⚔️ {cog_name}", value=desc, inline=False)
-        embed.set_footer(text="Use commands with caution...")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+for cog in initial_cogs:
+    try:
+        bot.load_extension(cog)
+        print(f"Loaded cog: {cog}")
+    except Exception as e:
+        print(f"Failed to load cog {cog}: {e}")
 
 # -----------------------
-# Load Cogs
+# Events
 # -----------------------
-bot.add_cog(HelpCog(bot))
-bot.load_extension("cogs.moderation")  # Make sure moderation.py is in cogs/
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user} ({bot.user.id})")
+    print("------")
 
 # -----------------------
-# Run Flask + Bot
+# Background Flask thread for Render
 # -----------------------
-if __name__ == "__main__":
-    import threading
+flask_thread = Thread(target=run_flask)
+flask_thread.start()
 
-    def run_flask():
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-    threading.Thread(target=run_flask).start()
-    bot.run(os.environ.get("TOKEN"))
+# -----------------------
+# Run bot
+# -----------------------
+TOKEN = os.environ.get("DISCORD_TOKEN")  # Store your bot token in Render's environment variables
+bot.run(TOKEN)
